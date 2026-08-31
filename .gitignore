@@ -30,3 +30,56 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# frontend settings (Next.js)
+
+# Dependencies
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+!frontend/.yarn/patches
+!frontend/.yarn/plugins
+!frontend/.yarn/releases
+!frontend/.yarn/versions
+
+# Testing
+frontend/coverage/
+
+# Next.js Build Output
+frontend/.next/
+frontend/out/
+
+# Production
+frontend/build/
+
+# Environment Files (Bảo mật - Chặn cấu hình môi trường)
+frontend/.env*
+
+# Vercel Deployment
+frontend/.vercel/
+
+# TypeScript Cache
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+
+# system and common rules
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# Certificates & Keys
+*.pem
+*.key
+
+# Debug logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
