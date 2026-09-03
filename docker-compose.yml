@@ -3,7 +3,7 @@ services:
   # Database chính: Postgres + PostGIS + TimescaleDB
   # ─────────────────────────────
   postgres:
-    image: timescale/timescaledb:2.29.2-pg16
+    image: timescale/timescaledb-ha:pg16
     container_name: aqi-postgres
     restart: unless-stopped
     environment:
