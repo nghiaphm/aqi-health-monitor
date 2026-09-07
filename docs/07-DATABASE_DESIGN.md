@@ -4,7 +4,7 @@
 **Database Engine:** PostgreSQL 16 + PostGIS + TimescaleDB
 **Primary DBMS Port:** 5432 | **Database Name:** `aqi_health_monitor`
 
-> Tài liệu này khớp 1:1 với các file migration đã viết (`backend/migrations/000001` → `000009`). Nếu có thay đổi schema, cập nhật migration trước, sau đó đồng bộ lại tài liệu này.
+> Tài liệu này khớp 1:1 với các file migration đã viết (`backend/migrations/000001` → `000011`). Nếu có thay đổi schema, cập nhật migration trước, sau đó đồng bộ lại tài liệu này.
 
 ## 1. Tổng quan Kiến trúc Dữ liệu (Architecture Overview)
 
@@ -23,6 +23,7 @@ erDiagram
     users ||--o{ alerts_log : "1-N"
     stations ||--o{ aqi_readings : "1-N (hypertable)"
     stations ||--o{ alerts_log : "1-N"
+    user_locations ||--o{ alerts_log : "1-N (optional)"
 ```
 
 ## 3. Chi tiết Bảng & Data Dictionary
@@ -128,7 +129,6 @@ erDiagram
 **Primary key**: `(station_id, time)` — bắt buộc chứa cột partition theo yêu cầu của TimescaleDB.
 
 **Timescale config**:
-
 ```sql
 SELECT create_hypertable('aqi_readings', 'time');
 ```
@@ -158,9 +158,13 @@ SELECT add_compression_policy('aqi_readings', INTERVAL '30 days');
 | endpoint | TEXT | NOT NULL, UNIQUE | URL push service của trình duyệt |
 | p256dh_key | VARCHAR(255) | NOT NULL | Public key mã hóa |
 | auth_key | VARCHAR(255) | NOT NULL | Auth secret |
+| is_active | BOOLEAN | NOT NULL, default `true` | Tắt mềm khi push thất bại (VD: trình duyệt trả 410 Gone), không xóa cứng để giữ lịch sử debug |
+| last_failed_at | TIMESTAMPTZ | NULL | Thời điểm gửi thất bại gần nhất |
 | created_at | TIMESTAMPTZ | default `now()` | Thời gian tạo |
 
-**Index**: `idx_push_subscriptions_user_id`.
+**Index**: `idx_push_subscriptions_user_id`, `idx_push_subscriptions_is_active`.
+
+> **Bổ sung ở migration `000011`** — hỗ trợ Business Rule nhóm D (xử lý subscription hết hạn): khi gửi push thất bại do endpoint không còn hợp lệ, đánh dấu `is_active = false` + ghi `last_failed_at` thay vì xóa record, giữ được lịch sử để debug/thống kê tỷ lệ thất bại.
 
 #### 3.8. `alerts_log`
 
@@ -171,12 +175,19 @@ SELECT add_compression_policy('aqi_readings', INTERVAL '30 days');
 | id | UUID | PK, default `gen_random_uuid()` | ID nhật ký |
 | user_id | UUID | FK → `users(id)` ON DELETE CASCADE | Người nhận |
 | station_id | UUID | FK → `stations(id)`, NOT NULL | Trạm kích hoạt cảnh báo |
+| location_id | UUID | FK → `user_locations(id)` ON DELETE SET NULL, NULL | Vị trí cụ thể của user đã kích hoạt cảnh báo (`current` hay `home`) |
 | aqi_value | INT | NOT NULL | Giá trị AQI tại thời điểm gửi |
 | channel | ENUM `alert_channel_enum` | NOT NULL | `web_push` \| `email` |
 | sent_at | TIMESTAMPTZ | default `now()` | Thời điểm gửi |
 | status | ENUM `alert_status_enum` | NOT NULL, default `'sent'` | `sent` \| `failed` |
 
-**Index**: `idx_alerts_log_user_sent_at` trên `(user_id, sent_at DESC)` — phục vụ trực tiếp câu query "đã gửi cảnh báo cho user này trong X giờ gần đây chưa".
+**Index**: `idx_alerts_log_user_sent_at` trên `(user_id, sent_at DESC)`; `idx_alerts_log_user_station_sent_at` trên `(user_id, station_id, sent_at DESC)` — phục vụ câu query chống spam **theo từng cặp user-trạm** (không chặn nhầm cảnh báo hợp lệ từ 1 trạm khác nếu user có nhiều vị trí).
+
+> **Bổ sung ở migration `000010`** — hỗ trợ Business Rule nhóm B (user có nhiều `user_locations`): `location_id` cho biết chính xác cảnh báo phát sinh từ vị trí nào, và index theo `(user_id, station_id, sent_at)` đảm bảo dedup đúng theo từng trạm thay vì chặn toàn bộ theo user.
+
+#### Ghi chú thiết kế: ma trận threshold mặc định KHÔNG lưu trong DB
+
+Đã cân nhắc tạo bảng cấu hình riêng (VD: `default_threshold_rules`) để lưu ma trận `condition_type × age_group × sensitivity_level → threshold_aqi`, nhưng quyết định **giữ trong code** (constant ở tầng service) thay vì DB, vì ma trận chỉ có 18 tổ hợp cố định, hiếm khi thay đổi — tạo bảng riêng cho use case này là dư thừa so với lợi ích. Ma trận đầy đủ được ghi trong `BUSINESS-RULES.md`.
 
 ## 4. Chiến lược Tối ưu Performance (Index & Retention)
 
@@ -186,4 +197,12 @@ SELECT add_compression_policy('aqi_readings', INTERVAL '30 days');
 
 ## 5. Ghi chú đối chiếu với migration
 
-Tài liệu này đã đồng bộ hoàn toàn với `backend/migrations/000001` → `000009`. Nếu phát sinh thay đổi schema trong quá trình code (VD: thêm cột mới khi implement Ingestion Worker), cập nhật theo thứ tự: **viết migration mới trước → chạy thử → cập nhật lại tài liệu này sau**, để tài liệu luôn phản ánh đúng trạng thái DB thực tế, không đi trước hoặc lệch pha với code.
+Tài liệu này đã đồng bộ hoàn toàn với `backend/migrations/000001` → `000011`. Nếu phát sinh thay đổi schema trong quá trình code (VD: thêm cột mới khi implement Ingestion Worker), cập nhật theo thứ tự: **viết migration mới trước → chạy thử → cập nhật lại tài liệu này sau**, để tài liệu luôn phản ánh đúng trạng thái DB thực tế, không đi trước hoặc lệch pha với code.
+
+### Lịch sử thay đổi schema
+
+| Migration | Thay đổi | Lý do |
+| --- | --- | --- |
+| 000001–000009 | Khởi tạo 8 bảng gốc + extensions | Thiết kế ban đầu |
+| 000010 | Thêm `alerts_log.location_id` + index `(user_id, station_id, sent_at)` | Business Rule nhóm B — dedup cảnh báo theo từng vị trí/trạm khi user có nhiều `user_locations` |
+| 000011 | Thêm `push_subscriptions.is_active`, `last_failed_at` | Business Rule nhóm D — tắt mềm subscription hết hạn (410 Gone) thay vì xóa cứng |
