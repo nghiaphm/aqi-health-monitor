@@ -28,7 +28,7 @@
 - Lần đầu đăng nhập (`keycloak_id` chưa có trong DB) → tự động tạo user (upsert) → chuyển sang Onboarding.
 - Đã từng đăng nhập → vào thẳng Dashboard.
 
-![User Flow 01 - Auth & Onboarding](../assets/flow-01.png)
+![User Flow 01 - Auth & Onboarding](./assets/flow-01.png)
 
 ---
 
@@ -42,7 +42,7 @@
 - User từ chối cấp quyền GPS → chuyển sang nhập địa chỉ thủ công.
 - User bỏ qua cả 2 cách nhập vị trí → vào Dashboard ở trạng thái giới hạn, có nhắc bổ sung vị trí sau.
 
-![User Flow 02 - Onboarding](../assets/flow-02.png)
+![User Flow 02 - Onboarding](./assets/flow-02.png)
 
 ---
 
@@ -55,7 +55,7 @@
 - Giá trị nhập không hợp lệ (ngoài khoảng 0–500) → báo lỗi, giữ nguyên giá trị cũ.
 - Lưu thành công → đánh dấu `is_custom = true`.
 
-![User Flow 03 - Custom Alert Threshold](../assets/flow-03.png)
+![User Flow 03 - Custom Alert Threshold](./assets/flow-03.png)
 
 ---
 
@@ -68,7 +68,7 @@
 - Trình duyệt không hỗ trợ Push API (VD: Safari cũ) → thông báo không hỗ trợ, gợi ý dùng kênh Email.
 - User từ chối quyền Notification → hướng dẫn cách bật lại thủ công trong cài đặt trình duyệt.
 
-![User Flow 04 - Web Push Subscription](../assets/flow-04.png)
+![User Flow 04 - Web Push Subscription](./assets/flow-04.png)
 
 ---
 
@@ -82,7 +82,7 @@
 - Chưa có vị trí đã lưu → hiển thị CTA quay lại Onboarding.
 - Cache Redis miss và TimescaleDB chưa có dữ liệu (trạm mới/worker chưa chạy lần nào) → hiển thị trạng thái "chưa có dữ liệu".
 
-![User Flow 05 - Dashboard](../assets/flow-05.png)
+![User Flow 05 - Dashboard](./assets/flow-05.png)
 
 ---
 
@@ -94,7 +94,7 @@
 
 - Không có dữ liệu trong khoảng thời gian đã chọn → hiển thị trạng thái rỗng, không vẽ biểu đồ trống gây hiểu lầm.
 
-![User Flow 06 - History](../assets/flow-06.png)
+![User Flow 06 - History](./assets/flow-06.png)
 
 ---
 
@@ -106,7 +106,7 @@
 
 - Danh sách rỗng (user chưa từng nhận cảnh báo nào) → hiển thị trạng thái rỗng thay vì bảng trống.
 
-![User Flow 07 - Alerts History](../assets/flow-07.png)
+![User Flow 07 - Alerts History](./assets/flow-07.png)
 
 ---
 

@@ -24,7 +24,7 @@
 
 **Thành phần chính**: logo/tên app ở giữa trên, tagline ngắn giới thiệu sản phẩm, nút "Đăng nhập" cố định ở dưới cùng.
 
-![Wireframe 01 - Login Landing](../assets/wireframe-01.png)
+![Wireframe 01 - Login Landing](./assets/wireframe-01.png)
 
 ---
 
@@ -34,7 +34,7 @@
 
 **Thành phần chính**: dropdown chọn bệnh lý (`condition_type`), dropdown chọn nhóm tuổi (`age_group`), nút "Tiếp tục" cố định dưới cùng.
 
-![Wireframe 02 - Onboarding Health Profile](../assets/wireframe-02.png)
+![Wireframe 02 - Onboarding Health Profile](./assets/wireframe-02.png)
 
 ---
 
@@ -44,7 +44,7 @@
 
 **Thành phần chính**: khung bản đồ placeholder, nút chính "Dùng vị trí hiện tại" (GPS), link phụ "Nhập địa chỉ thủ công" cho nhánh rẽ khi user từ chối cấp quyền GPS.
 
-![Wireframe 03 - Onboarding Location](../assets/wireframe-03.png)
+![Wireframe 03 - Onboarding Location](./assets/wireframe-03.png)
 
 ---
 
@@ -54,7 +54,7 @@
 
 **Thành phần chính**: thanh điều hướng trên cùng, gauge hiển thị chỉ số AQI hiện tại, badge mức độ cảnh báo, khung bản đồ vị trí thu nhỏ, khối khuyến nghị hành động ở cuối.
 
-![Wireframe 04 - Dashboard](../assets/wireframe-04.png)
+![Wireframe 04 - Dashboard](./assets/wireframe-04.png)
 
 ---
 
@@ -64,7 +64,7 @@
 
 **Thành phần chính**: bộ lọc khoảng thời gian (7 ngày / 30 ngày), khung biểu đồ đường thể hiện xu hướng AQI theo thời gian.
 
-![Wireframe 05 - History](../assets/wireframe-05.png)
+![Wireframe 05 - History](./assets/wireframe-05.png)
 
 ---
 
@@ -74,7 +74,7 @@
 
 **Thành phần chính**: slider chỉnh `threshold_aqi`, toggle bật/tắt thông báo đẩy (Web Push), nút "Lưu".
 
-![Wireframe 06 - Settings Threshold](../assets/wireframe-06.png)
+![Wireframe 06 - Settings Threshold](./assets/wireframe-06.png)
 
 ---
 
@@ -84,7 +84,7 @@
 
 **Thành phần chính**: danh sách dạng dòng (row), mỗi dòng gồm icon trạng thái, 2 dòng nội dung (mức AQI + trạm kích hoạt), và mốc thời gian tương đối.
 
-![Wireframe 07 - Alerts History](../assets/wireframe-07.png)
+![Wireframe 07 - Alerts History](./assets/wireframe-07.png)
 
 ---
 

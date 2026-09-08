@@ -101,7 +101,7 @@ export function AqiBadge({ aqi }: { aqi: number }) {
 
 Áp dụng bảng màu mục 1 và quy tắc hiển thị số liệu mục 2 vào đúng **1 màn hình đại diện** — dùng làm chuẩn tham chiếu khi code 6 màn còn lại, thay vì vẽ Hi-fi đầy đủ cho cả 7 màn (xem lý do ở mục 5).
 
-![Hi-fi Mockup - Dashboard](../assets/hifi-dashboard.png)
+![Hi-fi Mockup - Dashboard](./assets/hifi-dashboard.png)
 
 **Đối chiếu với `WIREFRAMES.md` mục 4**: giữ đúng bố cục đã chốt (top bar → gauge → vị trí → map → khuyến nghị), chỉ tô màu theo token. Có phát sinh 1 chi tiết mới so với wireframe gốc — hàng chỉ số phụ (PM2.5/PM10/O3) ở cuối màn hình — cần cập nhật ngược lại `WIREFRAMES.md` mục 4 để 2 tài liệu không lệch nhau.
 
