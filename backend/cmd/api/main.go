@@ -47,8 +47,12 @@ func run() error {
 	syncer := service.NewUserSyncer(userRepo, profileRepo, thresholdRepo, locationRepo)
 	userHandler := handlerpkg.NewUserHandler(syncer)
 
+	healthProfileSvc := service.NewHealthProfileService(db, syncer, profileRepo, thresholdRepo)
+	healthProfileHandler := handlerpkg.NewHealthProfileHandler(healthProfileSvc)
+
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/v1/me", mwpkg.Auth(verifier, http.HandlerFunc(userHandler.GetMe)))
+	mux.Handle("POST /api/v1/health-profile", mwpkg.Auth(verifier, http.HandlerFunc(healthProfileHandler.Upsert)))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.AppPort,

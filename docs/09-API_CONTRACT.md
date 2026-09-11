@@ -382,7 +382,7 @@ Các file backend đã scaffold (nội dung sẽ viết ở Bước 7). Quy ư�
 | --- | --- | --- | --- |
 | `condition_type` | enum | ✅ | `none` \| `asthma` \| `allergic_rhinitis` |
 | `age_group` | enum | ✅ | `child` \| `adult` \| `elderly` |
-| `sensitivity_level` | enum | ⬜ | Mặc định `normal` khi bỏ trống (MVP chưa thu thập trên UI Onboarding) |
+| `sensitivity_level` | enum | ⬜ | Thu thập trực tiếp tại Onboarding bước 1 (segmented control 'Bình thường' / 'Nhạy cảm hơn'). Vẫn giữ optional ở tầng API + mặc định normal nếu client không gửi — phòng trường hợp gọi API trực tiếp bỏ qua field này. |
 | `custom_threshold_aqi` | integer | ⬜ | Phạm vi **50–500**. Bỏ trống → tính mặc định theo ma trận, `is_custom=false`. Gửi kèm → `is_custom=true`. |
 
 **Response — 200 OK** (upsert, trả trạng thái cuối):
