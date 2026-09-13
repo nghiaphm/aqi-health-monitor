@@ -28,3 +28,28 @@ func (r *LocationRepo) FindAllByUserID(ctx context.Context, userID string) ([]mo
 	)
 	return out, err
 }
+
+// UpsertByUserAndLabel upsert ATOMIC theo (user_id, label) bằng ON CONFLICT
+// (dựa trên constraint uq_user_locations_user_label, migration 000012) —
+// tránh race condition khi 2 request đồng thời cùng user + label.
+// ST_MakePoint nhận (lng, lat) theo đúng thứ tự WGS84 của PostGIS.
+func (r *LocationRepo) UpsertByUserAndLabel(
+	ctx context.Context,
+	userID, label string,
+	latitude, longitude float64,
+	city *string,
+) (*models.UserLocation, error) {
+	var loc models.UserLocation
+	err := r.db.GetContext(ctx, &loc,
+		`INSERT INTO user_locations (user_id, label, geom, city)
+		 VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5)
+		 ON CONFLICT (user_id, label) DO UPDATE
+		 SET geom = EXCLUDED.geom, city = EXCLUDED.city
+		 RETURNING `+locationColumns,
+		userID, label, longitude, latitude, city,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &loc, nil
+}
