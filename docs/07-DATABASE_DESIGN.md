@@ -4,7 +4,7 @@
 **Database Engine:** PostgreSQL 16 + PostGIS + TimescaleDB
 **Primary DBMS Port:** 5432 | **Database Name:** `aqi_health_monitor`
 
-> Tài liệu này khớp 1:1 với các file migration đã viết (`backend/migrations/000001` → `000011`). Nếu có thay đổi schema, cập nhật migration trước, sau đó đồng bộ lại tài liệu này.
+> Tài liệu này khớp 1:1 với các file migration đã viết (`backend/migrations/000001` → `000012`). Nếu có thay đổi schema, cập nhật migration trước, sau đó đồng bộ lại tài liệu này.
 
 ## 1. Tổng quan Kiến trúc Dữ liệu (Architecture Overview)
 
@@ -88,6 +88,8 @@ erDiagram
 | geom | GEOGRAPHY(Point, 4326) | NOT NULL | Tọa độ GPS (WGS84: lng, lat) |
 | city | VARCHAR(100) | NULL | `hanoi` \| `ho-chi-minh-city` (khớp scope MVP) |
 | created_at | TIMESTAMPTZ | default `now()` | Thời gian tạo |
+
+**Constraint**: `uq_user_locations_user_label` UNIQUE `(user_id, label)` (migration `000012`) — bắt buộc để upsert atomic bằng `ON CONFLICT`, tránh race condition khi 2 request đồng thời cùng user + label.
 
 **Index**: `idx_user_locations_geom` (GiST trên `geom`), `idx_user_locations_user_id`.
 
@@ -197,7 +199,7 @@ SELECT add_compression_policy('aqi_readings', INTERVAL '30 days');
 
 ## 5. Ghi chú đối chiếu với migration
 
-Tài liệu này đã đồng bộ hoàn toàn với `backend/migrations/000001` → `000011`. Nếu phát sinh thay đổi schema trong quá trình code (VD: thêm cột mới khi implement Ingestion Worker), cập nhật theo thứ tự: **viết migration mới trước → chạy thử → cập nhật lại tài liệu này sau**, để tài liệu luôn phản ánh đúng trạng thái DB thực tế, không đi trước hoặc lệch pha với code.
+Tài liệu này đã đồng bộ hoàn toàn với `backend/migrations/000001` → `000012`. Nếu phát sinh thay đổi schema trong quá trình code (VD: thêm cột mới khi implement Ingestion Worker), cập nhật theo thứ tự: **viết migration mới trước → chạy thử → cập nhật lại tài liệu này sau**, để tài liệu luôn phản ánh đúng trạng thái DB thực tế, không đi trước hoặc lệch pha với code.
 
 ### Lịch sử thay đổi schema
 
@@ -206,3 +208,4 @@ Tài liệu này đã đồng bộ hoàn toàn với `backend/migrations/000001`
 | 000001–000009 | Khởi tạo 8 bảng gốc + extensions | Thiết kế ban đầu |
 | 000010 | Thêm `alerts_log.location_id` + index `(user_id, station_id, sent_at)` | Business Rule nhóm B — dedup cảnh báo theo từng vị trí/trạm khi user có nhiều `user_locations` |
 | 000011 | Thêm `push_subscriptions.is_active`, `last_failed_at` | Business Rule nhóm D — tắt mềm subscription hết hạn (410 Gone) thay vì xóa cứng |
+| 000012 | Thêm constraint `uq_user_locations_user_label` UNIQUE `(user_id, label)` trên `user_locations` | Cần UNIQUE làm điều kiện `ON CONFLICT` để upsert vị trí **atomic** — tránh race condition khi 2 request đồng thời cùng `user_id` + `label` (user bấm nút 2 lần liên tiếp lúc mạng yếu), thay vì cách SELECT-rồi-quyết-định dễ tạo row trùng |
