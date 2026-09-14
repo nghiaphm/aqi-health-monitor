@@ -11,9 +11,13 @@ type Config struct {
 	DBPassword     string
 	DBName         string
 	KeycloakIssuer string
+	RedisAddr      string
+	WAQIToken      string
+	WAQIBaseURL    string
 }
 
 func Load() Config {
+	redisAddr := env("REDIS_ADDR", env("REDIS_HOST", "localhost")+":"+env("REDIS_PORT", "6379"))
 	return Config{
 		AppPort:        env("APP_PORT", "8000"),
 		DBHost:         env("DB_HOST", "localhost"),
@@ -22,6 +26,9 @@ func Load() Config {
 		DBPassword:     env("DB_PASSWORD", "admin"),
 		DBName:         env("DB_NAME", "aqi"),
 		KeycloakIssuer: env("KEYCLOAK_ISSUER", "http://localhost:8080/realms/aqi-monitor"),
+		RedisAddr:      redisAddr,
+		WAQIToken:      env("WAQI_API_TOKEN", ""),
+		WAQIBaseURL:    env("WAQI_BASE_URL", "https://api.waqi.info"),
 	}
 }
 
