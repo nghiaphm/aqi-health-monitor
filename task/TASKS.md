@@ -43,7 +43,7 @@
 | Repo GitHub | ✅ Đã tạo, đã push scaffold | `chore/initial-project-scaffold` |
 | `docker-compose.yml` | ✅ Đã viết | postgres, redis, keycloak+db, backend-api, backend-worker, frontend |
 | `Dockerfile` backend/frontend | ✅ Đã viết | Backend multi-stage (`api`/`worker`); frontend cần `output: "standalone"` |
-| Migration DB | ✅ `000001` → `000011` đã viết | **Cần xác nhận đã `migrate up` đủ 11 file chưa** |
+| Migration DB | ✅ `000001` → `000012` đã viết | Đã chạy thử `migrate up` đủ 12 file trên scratch Postgres (Mục 2/3) |
 | Keycloak Realm/Client | ⚠️ Chưa xác nhận | Cần confirm trước khi code `auth_middleware.go` |
 | GitHub Actions CI/CD | ❌ Chưa viết | Thuộc Bước 10, chưa tới lúc |
 
