@@ -7,7 +7,7 @@
 >   - `docs/02-BUSINESS-RULES.md` — con số, invariant, ngưỡng cảnh báo, cooldown/dedup, khoảng cách 20km, stale 2h/3h
 >   - `docs/03-USER-FLOWS.md` — 7 luồng user & các nhánh rẽ phải xử lý được trên Frontend
 >   - `docs/06-SYSTEM-FLOW.md` — thứ tự vận hành & các giai đoạn (onboarding, dashboard, worker nền)
->   - `docs/07-DATABASE_DESIGN.md` — khớp 1:1 migration `000001`→`000011`
+>   - `docs/07-DATABASE_DESIGN.md` — khớp 1:1 migration `000001`→`000012`
 >   - `docs/08-SA.docx` — kiến trúc hệ thống (modular monolith, `/api/v1`, Redis cache-aside, tầng handler→service→repository)
 > - Khi 1 quyết định trong file này mâu thuẫn với tài liệu gốc: **sửa tài liệu gốc trước**, sau đó mới sửa contract — đúng nguyên tắc "tài liệu dẫn dắt code".
 

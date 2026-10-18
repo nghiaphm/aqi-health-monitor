@@ -27,7 +27,7 @@
 | 2 | User Flow & Wireframe (Low-fi) | ✅ Xong | `SYSTEM-FLOW.md`, `USER-FLOWS.md`, `WIREFRAMES.md` |
 | 3 | Domain Modeling & Business Rules | ✅ Xong | `BUSINESS-RULES.md`, `DATABASE_DESIGN.md` |
 | 4 | UI/UX Design (Hi-fi) | ✅ Xong (rút gọn có chủ đích) | `DESIGN-DECISIONS.md` |
-| 5 | System & Database Architecture | ✅ Xong | `ARCHITECTURE.md`, `DATABASE_DESIGN.md`, `migrations/000001–000011` |
+| 5 | System & Database Architecture | ✅ Xong | `ARCHITECTURE.md`, `DATABASE_DESIGN.md`, `migrations/000001–000012` |
 | 6 | API & Integration Contract Design | ✅ Xong | `API-CONTRACT.md` = `docs/09-API_CONTRACT.md` |
 | 7 | Vertical Slice (Tracer Bullet) | ⬜ Chưa bắt đầu | — |
 | 8 | Continuous Implementation | ⬜ Chưa bắt đầu | — |
