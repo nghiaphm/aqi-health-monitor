@@ -1,0 +1,86 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+
+# Huỷ run cũ khi PR có commit mới — tiết kiệm phút runner.
+concurrency:
+  group: frontend-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Cùng major version với frontend/Dockerfile (node:20-alpine); Next.js 16 yêu cầu >= 20.9.
+  NODE_VERSION: "20"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. Lint + type-check + production build
+  # ──────────────────────────────────────────────
+  build:
+    name: Lint, type-check & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      # Báo lỗi type sớm và rõ ràng, trước bước build tốn thời gian hơn.
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      # Cache incremental của Next.js — rebuild nhanh hơn giữa các commit trong PR.
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-${{ hashFiles('frontend/**/*.ts', 'frontend/**/*.tsx', 'frontend/**/*.css') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-
+
+      - name: Production build
+        run: npm run build
+
+  # ──────────────────────────────────────────────
+  # 2. Xác nhận Docker image (output: standalone) build được (không push)
+  # ──────────────────────────────────────────────
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: false
+          tags: aqi-health-monitor-frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
