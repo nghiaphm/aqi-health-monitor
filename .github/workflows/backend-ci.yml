@@ -1,0 +1,140 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+# Huỷ run cũ khi PR có commit mới — tiết kiệm phút runner.
+concurrency:
+  group: backend-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. Static checks: format, module tidiness, vet
+  # ──────────────────────────────────────────────
+  lint:
+    name: Lint (gofmt, go mod tidy, go vet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Check formatting (gofmt)
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::Các file sau chưa được gofmt:"
+            echo "$unformatted"
+            echo "Chạy 'gofmt -w .' trong thư mục backend rồi commit lại."
+            exit 1
+          fi
+
+      - name: Check go.mod / go.sum are tidy
+        run: go mod tidy -diff
+
+      - name: Verify module checksums
+        run: go mod verify
+
+      - name: go vet
+        run: go vet ./...
+
+  # ──────────────────────────────────────────────
+  # 2. Unit tests (race detector + coverage)
+  # ──────────────────────────────────────────────
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Run tests
+        run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Coverage summary
+        run: |
+          {
+            echo "### Backend coverage"
+            echo '```'
+            go tool cover -func=coverage.out | tail -n 1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.out
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # 3. Build cả 2 binary (api + worker)
+  # ──────────────────────────────────────────────
+  build:
+    name: Build binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # Cùng flag với Dockerfile (CGO_ENABLED=0, linux).
+      - name: Build api & worker
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+        run: |
+          go build -o /tmp/out/api ./cmd/api
+          go build -o /tmp/out/worker ./cmd/worker
+
+  # ──────────────────────────────────────────────
+  # 4. Xác nhận Docker image build được (không push)
+  # ──────────────────────────────────────────────
+  docker:
+    name: Docker build (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint, test, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [api, worker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.target }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          target: ${{ matrix.target }}
+          push: false
+          tags: aqi-health-monitor-${{ matrix.target }}:ci
+          cache-from: type=gha,scope=backend-${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=backend-${{ matrix.target }}
