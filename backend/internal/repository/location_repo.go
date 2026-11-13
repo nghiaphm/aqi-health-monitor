@@ -29,6 +29,32 @@ func (r *LocationRepo) FindAllByUserID(ctx context.Context, userID string) ([]mo
 	return out, err
 }
 
+// FindByIDAndUserID trả về 1 vị trí của user theo id. Không tìm thấy trả về sql.ErrNoRows.
+func (r *LocationRepo) FindByIDAndUserID(ctx context.Context, id, userID string) (*models.UserLocation, error) {
+	var loc models.UserLocation
+	err := r.db.GetContext(ctx, &loc,
+		"SELECT "+locationColumns+" FROM user_locations WHERE id = $1 AND user_id = $2",
+		id, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &loc, nil
+}
+
+// FindByUserAndLabel trả về vị trí của user theo nhãn (current | home). Không tìm thấy trả về sql.ErrNoRows.
+func (r *LocationRepo) FindByUserAndLabel(ctx context.Context, userID, label string) (*models.UserLocation, error) {
+	var loc models.UserLocation
+	err := r.db.GetContext(ctx, &loc,
+		"SELECT "+locationColumns+" FROM user_locations WHERE user_id = $1 AND label = $2",
+		userID, label,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &loc, nil
+}
+
 // UpsertByUserAndLabel upsert ATOMIC theo (user_id, label) bằng ON CONFLICT
 // (dựa trên constraint uq_user_locations_user_label, migration 000012) —
 // tránh race condition khi 2 request đồng thời cùng user + label.

@@ -46,6 +46,19 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  --color-aqi-good: #00E400;
+  --color-aqi-good-fg: #0A3D00;
+  --color-aqi-moderate: #F5C518;
+  --color-aqi-moderate-fg: #3D3000;
+  --color-aqi-unhealthy-sensitive: #FF7E00;
+  --color-aqi-unhealthy-sensitive-fg: #3D1F00;
+  --color-aqi-unhealthy: #FF0000;
+  --color-aqi-unhealthy-fg: #FFFFFF;
+  --color-aqi-very-unhealthy: #8F3F97;
+  --color-aqi-very-unhealthy-fg: #FFFFFF;
+  --color-aqi-hazardous: #7E0023;
+  --color-aqi-hazardous-fg: #FFFFFF;
 }
 
 :root {

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/jmoiron/sqlx"
 
@@ -9,6 +10,14 @@ import (
 )
 
 const stationColumns = `id, waqi_station_id, name, ST_Y(geom::geometry)::float8 AS latitude, ST_X(geom::geometry)::float8 AS longitude, city, is_active, last_synced_at`
+
+// NearestStation là trạm gần nhất được tìm thấy kèm khoảng cách tính theo mét.
+type NearestStation struct {
+	ID        string         `db:"id"`
+	Name      string         `db:"name"`
+	City      sql.NullString `db:"city"`
+	DistanceM int            `db:"distance_m"`
+}
 
 type StationRepo struct {
 	db *sqlx.DB
@@ -52,4 +61,27 @@ func (r *StationRepo) ListActive(ctx context.Context) ([]models.Station, error) 
 		"SELECT "+stationColumns+" FROM stations WHERE is_active = true ORDER BY waqi_station_id",
 	)
 	return out, err
+}
+
+// FindNearestWithin tìm trạm active gần nhất trong bán kính maxMeters (mét) tính từ (lat, lng).
+// Tọa độ điểm user được truyền vào PostGIS dạng WGS84 ST_MakePoint(lng, lat).
+// Trả về sql.ErrNoRows nếu không có trạm nào trong bán kính.
+func (r *StationRepo) FindNearestWithin(ctx context.Context, lat, lng float64, maxMeters float64) (*NearestStation, error) {
+	var ns NearestStation
+	query := `
+		SELECT 
+			id, 
+			name, 
+			city, 
+			ROUND(ST_Distance(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography))::int AS distance_m
+		FROM stations
+		WHERE is_active = true 
+		  AND ST_DWithin(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $3)
+		ORDER BY ST_Distance(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) ASC
+		LIMIT 1`
+	err := r.db.GetContext(ctx, &ns, query, lng, lat, maxMeters)
+	if err != nil {
+		return nil, err
+	}
+	return &ns, nil
 }
