@@ -49,11 +49,18 @@ func run(task string) error {
 	defer rdb.Close()
 
 	waqiClient := waqi.NewClient(cfg.WAQIToken, cfg.WAQIBaseURL)
+	locationRepo := repository.NewLocationRepo(db)
+	userRepo := repository.NewUserRepo(db)
+	profileRepo := repository.NewHealthProfileRepo(db)
+	thresholdRepo := repository.NewAlertThresholdRepo(db)
+	syncer := service.NewUserSyncer(userRepo, profileRepo, thresholdRepo, locationRepo)
 	aqiSvc := service.NewAQIService(
 		waqiClient,
 		repository.NewStationRepo(db),
 		repository.NewAQIReadingRepo(db),
 		rdb,
+		syncer,
+		locationRepo,
 	)
 
 	switch task {

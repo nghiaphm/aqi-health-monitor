@@ -54,3 +54,19 @@ func (r *AQIReadingRepo) Insert(ctx context.Context, rd models.AQIReading) (bool
 	}
 	return rows > 0, nil
 }
+
+// GetLatest lấy bản ghi reading mới nhất của 1 trạm. Không có reading trả về sql.ErrNoRows.
+func (r *AQIReadingRepo) GetLatest(ctx context.Context, stationID string) (*models.AQIReading, error) {
+	var rd models.AQIReading
+	query := `
+		SELECT time, station_id, aqi, pm25, pm10, o3, no2, so2, co, dominant_pollutant
+		FROM aqi_readings
+		WHERE station_id = $1
+		ORDER BY time DESC
+		LIMIT 1`
+	err := r.db.GetContext(ctx, &rd, query, stationID)
+	if err != nil {
+		return nil, err
+	}
+	return &rd, nil
+}
