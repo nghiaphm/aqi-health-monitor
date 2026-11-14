@@ -1,6 +1,6 @@
 # API Contract — AQI Health Monitor
 
-> **Trạng thái**: Bước 6 — API & Integration Contract Design (✅ Xong). Contract được chốt cho **4 endpoint của Vertical Slice đầu tiên**, không phải toàn bộ API sản phẩm.
+> **Trạng thái**: Bước 6 (4 endpoint Vertical Slice ✅ Xong) → đang mở rộng theo từng Feature Group ở Bước 8 (`S08-FG-01`: `POST/DELETE /api/v1/push-subscriptions` ✅ Chốt).
 >
 > - Tên file vật lý: `docs/09-API_CONTRACT.md` — trong bảng `TASKS.md`/`CURRENT-TASK.md` gọi tắt là `API-CONTRACT.md`.
 > - Nguồn đối chiếu bắt buộc (không tự suy đoán field/quy tắc nghiệp vụ ngoài các file này):
@@ -33,6 +33,8 @@
    - [4.2 POST /api/v1/health-profile](#42-post-apiv1health-profile)
    - [4.3 POST /api/v1/locations](#43-post-apiv1locations)
    - [4.4 GET /api/v1/aqi/current](#44-get-apiv1aqicurrent)
+   - [4.5 POST /api/v1/push-subscriptions](#45-post-apiv1push-subscriptions)
+   - [4.6 DELETE /api/v1/push-subscriptions](#46-delete-apiv1push-subscriptions)
 5. [Đối chiếu với USER-FLOWS (7 flow)](#5-đối-chiếu-với-user-flows-7-flow)
 6. [Quyết định & backlog sau Bước 6](#6-quyết-định--backlog-sau-bước-6)
 
@@ -46,8 +48,10 @@
 | 2 | `POST /api/v1/health-profile` | Upsert hồ sơ sức khỏe + ngưỡng cảnh báo theo user (dùng cho Onboarding lẫn chỉnh hồ sơ/ngưỡng sau này) | Flow 2, 3 |
 | 3 | `POST /api/v1/locations` | Upsert vị trí theo `label` (`current`/`home`) — GPS hoặc nhập tay | Flow 2 |
 | 4 | `GET /api/v1/aqi/current` | AQI hiện tại tại 1 vị trí đã lưu của user (màn hình Dashboard) | Flow 5 |
+| 5 | `POST /api/v1/push-subscriptions` | Đăng ký/làm mới Web Push subscription của trình duyệt cho user | Flow 4 |
+| 6 | `DELETE /api/v1/push-subscriptions` | Tắt mềm (`is_active = false`) Web Push subscription theo `endpoint` của user | Flow 4 |
 
-Ghi chú phạm vi: Push subscription (Flow 4), History (Flow 6), Alerts list (Flow 7) **không** thuộc 4 endpoint này — xem mục [6](#6-quyết-định--backlog-sau-bước-6).
+Ghi chú phạm vi: History (Flow 6), Alerts list (Flow 7) chưa chốt trong tài liệu này — xem mục [6](#6-quyết-định--backlog-sau-bước-6).
 
 ---
 
@@ -81,7 +85,7 @@ Authorization: Bearer <access_token>
 
 ### 2.4 ID
 
-- Mọi resource ID (`user`, `health_profile`, `alert_threshold`, `location`, `station`) là **UUID v4**, truyền/nhận dưới dạng **string**.
+- Mọi resource ID (`user`, `health_profile`, `alert_threshold`, `location`, `station`, `push_subscription`) là **UUID v4**, truyền/nhận dưới dạng **string**.
 - Format chuẩn: `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx` (hex, lowercase). Backend sinh bằng `gen_random_uuid()` (DB) / `google/uuid` (Go).
 - Không expose ID gốc bên thứ ba (VD: `waqi_station_id`) làm ID của API — theo đúng `07-DATABASE_DESIGN.md` mục 3.5.
 
@@ -166,13 +170,14 @@ Mọi mã lỗi dưới đây đều **đối chiếu được với tài liệu
 | Code | HTTP | Ý nghĩa | Endpoint nào trả (trong 4 endpoint) | Nguồn tài liệu |
 | --- | --- | --- | --- | --- |
 | `UNAUTHORIZED` | 401 | Token thiếu / không hợp lệ / hết hạn — không xác định được user | Tất cả | `06-SYSTEM-FLOW.md` GĐ1; `03-USER-FLOWS.md` Flow 1 ("đăng nhập thất bại") |
-| `VALIDATION_ERROR` | 400 | Payload sai cấu trúc/kiểu/giá trị: sai enum, thiếu field bắt buộc, `lat`/`lng` ngoài khoảng, `threshold_aqi > 500`, không phải số nguyên… Kèm `details[]`. | `POST /health-profile`, `POST /locations`, `GET /aqi/current` (query sai format) | `08-SA.docx` mục 5.2 (input validation, đặc biệt tọa độ GPS); `03-USER-FLOWS.md` Flow 3 ("giá trị nhập không hợp lệ"); CHECK `0–500` trong `07-DATABASE_DESIGN.md` mục 3.3 |
+| `VALIDATION_ERROR` | 400 | Payload sai cấu trúc/kiểu/giá trị: sai enum, thiếu field bắt buộc, `lat`/`lng` ngoài khoảng, `threshold_aqi > 500`, không phải số nguyên, URL/key push không hợp lệ… Kèm `details[]`. | `POST /health-profile`, `POST /locations`, `GET /aqi/current`, `POST/DELETE /push-subscriptions` | `08-SA.docx` mục 5.2 (input validation, đặc biệt tọa độ GPS); `03-USER-FLOWS.md` Flow 3 ("giá trị nhập không hợp lệ"); CHECK `0–500` trong `07-DATABASE_DESIGN.md` mục 3.3 |
 | `THRESHOLD_TOO_LOW` | 422 | `custom_threshold_aqi < 50` — yêu cầu hợp lệ về cấu trúc nhưng vi phạm ràng buộc nghiệp vụ. **Không** tự clamp lại giá trị. | `POST /health-profile` | `02-BUSINESS-RULES.md` mục 1 ("từ chối giá trị dưới 50… Trả lỗi rõ ràng cho Frontend hiển thị, không âm thầm clamp") |
 | `PROFILE_NOT_FOUND` | 404 | Thao tác **yêu cầu hồ sơ đã tồn tại** nhưng user chưa có `health_profile` | Không endpoint nào trong 4 endpoint này (xem mục [6](#6-quyết-định--backlog-sau-bước-6)) — dự kiến cho endpoint profile/threshold riêng ở Bước 7/8 | `02-BUSINESS-RULES.md` mục 0 (invariant profile); `03-USER-FLOWS.md` Flow 2 |
 | `LOCATION_NOT_FOUND` | 404 | `location_id` không tồn tại / không thuộc user; hoặc user **không có vị trí nào** để resolve mặc định | `GET /aqi/current` | `03-USER-FLOWS.md` Flow 5 ("chưa có vị trí đã lưu") |
 | `NO_STATION_COVERAGE` | 404 | Không có trạm `is_active` nào trong bán kính **20 km** quanh vị trí → coi như "chưa có dữ liệu khu vực này" | `GET /aqi/current` | `02-BUSINESS-RULES.md` mục 3 (20 km) |
 | `NO_DATA` | 404 | Có trạm hợp lệ nhưng **chưa từng có** `aqi_readings` nào (worker chưa chạy / trạm mới thêm) | `GET /aqi/current` | `03-USER-FLOWS.md` Flow 5 ("cache Redis miss và TimescaleDB chưa có dữ liệu") |
 | `DATA_STALE` | 422 | Có reading nhưng **quá cũ** (muộn hơn **3 giờ** so với hiện tại) — không đủ tin cậy để trả giá trị "hiện tại" | `GET /aqi/current` | `02-BUSINESS-RULES.md` mục 3 (stale > 3h — gấp 3 chu kỳ fetch) |
+| `SUBSCRIPTION_NOT_FOUND` | 404 | `endpoint` không tồn tại hoặc không thuộc user hiện tại khi hủy/tắt Web Push | `DELETE /push-subscriptions` | `03-USER-FLOWS.md` Flow 4; `07-DATABASE_DESIGN.md` mục 3.7 (`push_subscriptions`) |
 
 Nhóm HTTP status được dùng có chủ đích:
 
@@ -238,6 +243,18 @@ Các file backend đã scaffold (nội dung sẽ viết ở Bước 7). Quy ư�
 ### 3.5. `CurrentAqi` (aggregate của GET /aqi/current)
 
 = `location` + `station` + `reading` + `advice`. Chi tiết ở [4.4](#44-get-apiv1aqicurrent).
+
+### 3.6. `PushSubscription` (push_subscriptions)
+
+| Field | Kiểu | Mô tả |
+| --- | --- | --- |
+| `id` | string (UUID) | ID đăng ký |
+| `endpoint` | string | URL push service của trình duyệt (`https://...`) |
+| `is_active` | boolean | Trạng thái hoạt động (`true` khi mới đăng ký / làm mới; `false` khi user tắt hoặc push service trả 404/410) |
+| `last_failed_at` | string (ISO) \| null | Thời điểm gửi push thất bại gần nhất; được reset về `null` khi re-register thành công |
+| `created_at` | string (ISO) | Thời điểm tạo bản ghi |
+
+*(Lưu ý bảo mật: `p256dh_key` và `auth_key` là write-only từ client, không trả lại trong response.)*
 
 ---
 
@@ -609,6 +626,129 @@ Ví dụ khi **không gửi** `custom_threshold_aqi` (`asthma` + `adult` + `norm
 
 ---
 
+### 4.5 POST /api/v1/push-subscriptions
+
+**Mục đích**: đăng ký mới hoặc làm mới Web Push subscription của trình duyệt cho user hiện tại (Flow 4, Bước 8 `S08-FG-01`).
+
+**Auth**: ✅ Bearer token.
+
+**Chuỗi file tương tác**:
+
+```
+[frontend] lib/hooks/use-push-subscription.ts / lib/api/push.ts (Profile / Settings toggle)
+  → POST /api/v1/push-subscriptions (Bearer token)
+[backend]
+  1. cmd/api/main.go                       — route POST /api/v1/push-subscriptions, auth middleware
+  2. internal/middleware/auth_middleware.go — verify JWT, gắn claims
+  3. internal/handler/push_handler.go      — Upsert():
+        - decode & validate endpoint (HTTPS URL, ≤ 2048 chars),
+          p256dh_key & auth_key (non-empty, no whitespace, ≤ 255 chars, base64/base64url hợp lệ)
+  4. internal/service/push_subscription_service.go — UpsertSubscription(claims, input):
+        - FindOrCreate user theo keycloak_id
+        - upsert atomic theo endpoint (re-activate is_active=true, reset last_failed_at=NULL;
+          nếu endpoint trùng của user khác trên cùng trình duyệt → reassign về user hiện tại)
+  5. internal/repository/push_subscription_repo.go — UpsertByEndpoint
+  6. PostgreSQL                            — bảng push_subscriptions
+[backend] → 200 JSON PushSubscription (hoặc error envelope)
+```
+
+**Request body** *(FE map từ `PushSubscription.toJSON()`: `endpoint`, `keys.p256dh` → `p256dh_key`, `keys.auth` → `auth_key`)*:
+
+```json
+{
+  "endpoint": "https://fcm.googleapis.com/fcm/send/example-token",
+  "p256dh_key": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM",
+  "auth_key": "tBHItJI5svbpez7KI4CCXg"
+}
+```
+
+**Bảng field request**:
+
+| Field | Kiểu | Bắt buộc | Ràng buộc / Mô tả |
+| --- | --- | --- | --- |
+| `endpoint` | string | ✅ | Trim whitespace; URL `https://` hợp lệ có host, độ dài `1..2048` ký tự |
+| `p256dh_key` | string | ✅ | Không rỗng, không chứa khoảng trắng, `≤ 255` ký tự, decode base64/base64url hợp lệ (bytes > 0) |
+| `auth_key` | string | ✅ | Không rỗng, không chứa khoảng trắng, `≤ 255` ký tự, decode base64/base64url hợp lệ (bytes > 0) |
+
+**Hành vi Re-registration & Conflict (`UNIQUE(endpoint)`)**:
+
+- **Cùng user đăng ký lại** (retry, đổi key, hoặc từng bị soft-disable `is_active = false`): cập nhật `p256dh_key`, `auth_key`, đặt lại `is_active = true`, `last_failed_at = NULL`, giữ nguyên `id` và `created_at`.
+- **Khác user nhưng cùng `endpoint`** (user khác đăng nhập trên cùng trình duyệt): **reassign `user_id`** sang user hiện tại, cập nhật keys, đặt `is_active = true`, `last_failed_at = NULL` — tránh gửi nhầm cảnh báo của tài khoản cũ trên trình duyệt hiện tại.
+
+**Response — 200 OK** *(upsert idempotent, không echo lại `p256dh_key` / `auth_key`)*:
+
+```json
+{
+  "id": "d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f70",
+  "endpoint": "https://fcm.googleapis.com/fcm/send/example-token",
+  "is_active": true,
+  "last_failed_at": null,
+  "created_at": "2026-11-14T14:55:00Z"
+}
+```
+
+**Lỗi**:
+
+| HTTP | Code | Ví dụ điều kiện |
+| --- | --- | --- |
+| 400 | `VALIDATION_ERROR` | JSON không hợp lệ, thiếu field bắt buộc, `endpoint` không phải `https://`, key > 255 ký tự hoặc sai base64/base64url |
+| 401 | `UNAUTHORIZED` | Token không hợp lệ |
+
+---
+
+### 4.6 DELETE /api/v1/push-subscriptions
+
+**Mục đích**: tắt mềm (`is_active = false`) 1 Web Push subscription thuộc user hiện tại khi người dùng gạt tắt thông báo đẩy trong cài đặt (Wireframe 06).
+
+**Auth**: ✅ Bearer token.
+
+**Chuỗi file tương tác**:
+
+```
+[frontend] lib/hooks/use-push-subscription.ts / lib/api/push.ts
+  → DELETE /api/v1/push-subscriptions (Bearer token)
+[backend]
+  1. cmd/api/main.go                       — route DELETE /api/v1/push-subscriptions, auth middleware
+  2. internal/middleware/auth_middleware.go — verify JWT, gắn claims
+  3. internal/handler/push_handler.go      — Deactivate(): decode & validate endpoint (HTTPS URL, ≤ 2048)
+  4. internal/service/push_subscription_service.go — DeactivateSubscription(claims, endpoint):
+        - FindOrCreate user theo keycloak_id
+        - soft-disable WHERE user_id = $1 AND endpoint = $2 → nếu không có row → ErrPushSubscriptionNotFound
+  5. internal/repository/push_subscription_repo.go — DeactivateByUserAndEndpoint
+  6. PostgreSQL                            — bảng push_subscriptions
+[backend] → 200 JSON PushSubscription (is_active = false) hoặc 404 SUBSCRIPTION_NOT_FOUND
+```
+
+**Request body**:
+
+```json
+{
+  "endpoint": "https://fcm.googleapis.com/fcm/send/example-token"
+}
+```
+
+**Response — 200 OK**:
+
+```json
+{
+  "id": "d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f70",
+  "endpoint": "https://fcm.googleapis.com/fcm/send/example-token",
+  "is_active": false,
+  "last_failed_at": null,
+  "created_at": "2026-11-14T14:55:00Z"
+}
+```
+
+**Lỗi**:
+
+| HTTP | Code | Ví dụ điều kiện |
+| --- | --- | --- |
+| 400 | `VALIDATION_ERROR` | JSON không hợp lệ hoặc `endpoint` thiếu/sai định dạng `https://` |
+| 401 | `UNAUTHORIZED` | Token không hợp lệ |
+| 404 | `SUBSCRIPTION_NOT_FOUND` | `endpoint` không tồn tại hoặc không thuộc user hiện tại |
+
+---
+
 ## 5. Đối chiếu với USER-FLOWS (7 flow)
 
 Đảm bảo **mọi nhánh rẽ trong USER-FLOWS đều có response field / error code tương ứng** để FE xử lý. Cột "Field/Code FE dùng" ghi đúng dữ liệu FE cần đọc để rẽ nhánh.
@@ -626,7 +766,9 @@ Ví dụ khi **không gửi** `custom_threshold_aqi` (`asthma` + `adult` + `norm
 | **3. Tùy chỉnh ngưỡng** | Giá trị không hợp lệ (< 50) | `POST /health-profile` | `422 THRESHOLD_TOO_LOW` | FE giữ nguyên giá trị cũ |
 | | Giá trị không hợp lệ khác (> 500 / sai kiểu) | `POST /health-profile` | `400 VALIDATION_ERROR` (+ `details[].field`) | FE giữ nguyên giá trị cũ |
 | | Lưu thành công | `POST /health-profile` | `200` + `alert_threshold.is_custom == true` | |
-| **4. Web Push** | Trình duyệt không hỗ trợ Push API / từ chối Notification | — (endpoint push ở Bước 7/8, `POST /api/v1/push-subscriptions`) | — | Ngoài phạm vi 4 endpoint của slice; nhánh lỗi là FE-only |
+| **4. Web Push** | Trình duyệt không hỗ trợ Push API / từ chối Notification | — (FE-only trước khi gọi API) | Trạng thái trình duyệt (`PushManager`, `Notification.permission`) | FE thông báo không hỗ trợ (gợi ý Email) hoặc hướng dẫn bật quyền |
+| | Bật / đồng bộ thông báo đẩy | `POST /push-subscriptions` | `200` + `PushSubscription` (`is_active == true`) | Lưu/làm mới subscription; dùng `NEXT_PUBLIC_VAPID_PUBLIC_KEY` |
+| | Tắt thông báo đẩy | `DELETE /push-subscriptions` | `200` + `PushSubscription` (`is_active == false`) (hoặc bỏ qua `404 SUBSCRIPTION_NOT_FOUND`) | Soft-disable phía server song song `subscription.unsubscribe()` trên trình duyệt |
 | **5. Dashboard** | Chưa đăng nhập | `GET /me`, `GET /aqi/current` | `401 UNAUTHORIZED` | FE redirect login |
 | | Chưa có vị trí đã lưu | `GET /me` | `locations: []` | FE hiện CTA Onboarding (không gọi `/aqi/current`) |
 | | Cache Redis miss + TimescaleDB chưa có dữ liệu | `GET /aqi/current` | `404 NO_DATA` | FE trạng thái "chưa có dữ liệu" |
@@ -657,4 +799,4 @@ Ví dụ khi **không gửi** `custom_threshold_aqi` (`asthma` + `adult` + `norm
 - Implement 4 endpoint đúng chuỗi file đã liệt kê + Ingestion Worker tối thiểu.
 - Xác nhận Keycloak Realm/Client trước khi code `auth_middleware.go`.
 - Chạy thử `migrate up` đủ 11 migration, verify bằng `\dt` trong `psql`.
-- Mở rộng contract khi thêm endpoint: `POST /api/v1/push-subscriptions` (Flow 4), `GET /api/v1/aqi/history` (Flow 6), `GET /api/v1/alerts` (Flow 7), và các endpoint profile/threshold (nơi dùng `PROFILE_NOT_FOUND`).
+- Mở rộng contract khi thêm endpoint ở Bước 8: `POST/DELETE /api/v1/push-subscriptions` (✅ đã chốt ở `S08-FG-01-CL-01`), còn lại `GET /api/v1/aqi/history` (Flow 6), `GET /api/v1/alerts` (Flow 7), và các endpoint profile/threshold (nơi dùng `PROFILE_NOT_FOUND`).

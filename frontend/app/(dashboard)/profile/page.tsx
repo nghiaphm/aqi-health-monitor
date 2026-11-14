@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/store/auth-store";
 import { HealthProfileForm } from "@/components/health-profile/health-profile-form";
+import { PushSubscriptionCard } from "@/components/alerts/push-subscription-card";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,8 @@ export default function ProfilePage() {
           />
         </CardContent>
       </Card>
+
+      <PushSubscriptionCard />
     </div>
   );
 }
