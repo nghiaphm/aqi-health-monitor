@@ -54,6 +54,7 @@ func run() error {
 	locationRepo := repository.NewLocationRepo(db)
 	stationRepo := repository.NewStationRepo(db)
 	readingRepo := repository.NewAQIReadingRepo(db)
+	pushSubRepo := repository.NewPushSubscriptionRepo(db)
 
 	syncer := service.NewUserSyncer(userRepo, profileRepo, thresholdRepo, locationRepo)
 	userHandler := handlerpkg.NewUserHandler(syncer)
@@ -68,15 +69,20 @@ func run() error {
 	aqiSvc := service.NewAQIService(waqiClient, stationRepo, readingRepo, rdb, syncer, locationRepo)
 	aqiHandler := handlerpkg.NewAQIHandler(aqiSvc)
 
+	pushSubSvc := service.NewPushSubscriptionService(syncer, pushSubRepo)
+	pushHandler := handlerpkg.NewPushHandler(pushSubSvc)
+
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/v1/me", mwpkg.Auth(verifier, http.HandlerFunc(userHandler.GetMe)))
 	mux.Handle("POST /api/v1/health-profile", mwpkg.Auth(verifier, http.HandlerFunc(healthProfileHandler.Upsert)))
 	mux.Handle("POST /api/v1/locations", mwpkg.Auth(verifier, http.HandlerFunc(locationHandler.Upsert)))
 	mux.Handle("GET /api/v1/aqi/current", mwpkg.Auth(verifier, http.HandlerFunc(aqiHandler.GetCurrent)))
+	mux.Handle("POST /api/v1/push-subscriptions", mwpkg.Auth(verifier, http.HandlerFunc(pushHandler.Upsert)))
+	mux.Handle("DELETE /api/v1/push-subscriptions", mwpkg.Auth(verifier, http.HandlerFunc(pushHandler.Deactivate)))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.AppPort,
-		Handler:           mux,
+		Handler:           mwpkg.CORS(cfg.CORSAllowedOrigin, mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
