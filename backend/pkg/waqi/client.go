@@ -37,6 +37,13 @@ func NewClient(token, baseURL string) *Client {
 	}
 }
 
+// SetHTTPClient cho phép inject custom http.Client (ví dụ in-memory transport khi test).
+func (c *Client) SetHTTPClient(hc *http.Client) {
+	if hc != nil {
+		c.httpClient = hc
+	}
+}
+
 // BoundsStation là 1 phần tử trong data[] của /map/bounds/.
 type BoundsStation struct {
 	UID  int

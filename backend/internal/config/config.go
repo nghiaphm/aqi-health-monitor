@@ -15,6 +15,12 @@ type Config struct {
 	WAQIToken         string
 	WAQIBaseURL       string
 	CORSAllowedOrigin string
+	ResendAPIKey      string
+	ResendFromEmail   string
+	ResendBaseURL     string
+	VAPIDPublicKey    string
+	VAPIDPrivateKey   string
+	VAPIDSubject      string
 }
 
 func Load() Config {
@@ -31,6 +37,12 @@ func Load() Config {
 		WAQIToken:         env("WAQI_API_TOKEN", ""),
 		WAQIBaseURL:       env("WAQI_BASE_URL", "https://api.waqi.info"),
 		CORSAllowedOrigin: env("CORS_ALLOWED_ORIGIN", "http://localhost:3000"),
+		ResendAPIKey:      env("RESEND_API_KEY", ""),
+		ResendFromEmail:   env("RESEND_FROM_EMAIL", "AQI Health Monitor <onboarding@resend.dev>"),
+		ResendBaseURL:     env("RESEND_BASE_URL", "https://api.resend.com"),
+		VAPIDPublicKey:    env("VAPID_PUBLIC_KEY", ""),
+		VAPIDPrivateKey:   env("VAPID_PRIVATE_KEY", ""),
+		VAPIDSubject:      env("VAPID_SUBJECT", "mailto:alerts@aqi-health-monitor.local"),
 	}
 }
 

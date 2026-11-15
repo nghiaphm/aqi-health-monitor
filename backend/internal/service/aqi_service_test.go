@@ -1,8 +1,14 @@
 package service
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
+
+	"aqi-health-monitor/backend/internal/models"
+	"aqi-health-monitor/backend/internal/repository"
+	"aqi-health-monitor/backend/pkg/waqi"
 )
 
 func TestAQILevel(t *testing.T) {
@@ -71,5 +77,99 @@ func TestAQIService_StaleRule(t *testing.T) {
 	staleTime := fixedNow.Add(-3*time.Hour - 1*time.Minute)
 	if svc.now().Sub(staleTime) <= 3*time.Hour {
 		t.Errorf("reading > 3h old must be stale")
+	}
+}
+
+type mockAQIWAQIClient struct {
+	feeds map[string]*waqi.Feed
+}
+
+func (m *mockAQIWAQIClient) FetchStationsInBounds(ctx context.Context, lat1, lng1, lat2, lng2 float64) ([]waqi.BoundsStation, error) {
+	return nil, nil
+}
+
+func (m *mockAQIWAQIClient) FetchStationFeed(ctx context.Context, waqiStationID string) (*waqi.Feed, error) {
+	return m.feeds[waqiStationID], nil
+}
+
+type mockAQIStationStore struct {
+	active []models.Station
+}
+
+func (m *mockAQIStationStore) UpsertByWAQIID(ctx context.Context, waqiStationID, name string, lat, lon float64, city *string) (*models.Station, error) {
+	return nil, nil
+}
+
+func (m *mockAQIStationStore) ListActive(ctx context.Context) ([]models.Station, error) {
+	return m.active, nil
+}
+
+func (m *mockAQIStationStore) FindNearestWithin(ctx context.Context, lat, lon, maxMeters float64) (*repository.NearestStation, error) {
+	return nil, nil
+}
+
+type mockAQIReadingStore struct {
+	insertedByStation map[string]bool
+}
+
+func (m *mockAQIReadingStore) Insert(ctx context.Context, rd models.AQIReading) (bool, error) {
+	return m.insertedByStation[rd.StationID], nil
+}
+
+func (m *mockAQIReadingStore) GetLatest(ctx context.Context, stationID string) (*models.AQIReading, error) {
+	return nil, nil
+}
+
+type mockAlertCheckEnqueuer struct {
+	enqueued []string
+	failOn   string
+}
+
+func (m *mockAlertCheckEnqueuer) EnqueueCheckAlerts(ctx context.Context, stationID string) error {
+	if m.failOn == stationID {
+		return errors.New("queue down")
+	}
+	m.enqueued = append(m.enqueued, stationID)
+	return nil
+}
+
+func TestAQIService_FetchReadings_EnqueuesAlertOnlyWhenInserted(t *testing.T) {
+	now := time.Date(2026, 11, 15, 6, 0, 0, 0, time.UTC)
+	svc := &AQIService{
+		waqi: &mockAQIWAQIClient{
+			feeds: map[string]*waqi.Feed{
+				"@1": {AQI: 160, HasAQI: true, MeasuredAt: now},
+				"@2": {AQI: 140, HasAQI: true, MeasuredAt: now},
+				"@3": {AQI: 130, HasAQI: true, MeasuredAt: now},
+			},
+		},
+		stations: &mockAQIStationStore{
+			active: []models.Station{
+				{ID: "st-new", WAQIStationID: "@1", Name: "New Station"},
+				{ID: "st-dup", WAQIStationID: "@2", Name: "Duplicate Reading Station"},
+				{ID: "st-enq-err", WAQIStationID: "@3", Name: "Enqueue Error Station"},
+			},
+		},
+		readings: &mockAQIReadingStore{
+			insertedByStation: map[string]bool{
+				"st-new":     true,
+				"st-dup":     false,
+				"st-enq-err": true,
+			},
+		},
+	}
+
+	enq := &mockAlertCheckEnqueuer{failOn: "st-enq-err"}
+	svc.SetAlertEnqueuer(enq)
+
+	res, err := svc.FetchReadings(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected FetchReadings error: %v", err)
+	}
+	if res.Total != 3 || res.Success != 3 || res.Inserted != 2 || res.AlertEnqueued != 1 {
+		t.Fatalf("unexpected result: %+v", res)
+	}
+	if len(enq.enqueued) != 1 || enq.enqueued[0] != "st-new" {
+		t.Fatalf("expected only st-new enqueued, got %+v", enq.enqueued)
 	}
 }

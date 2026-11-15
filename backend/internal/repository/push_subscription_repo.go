@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -62,4 +63,23 @@ func (r *PushSubscriptionRepo) DeactivateByUserAndEndpoint(
 		return nil, err
 	}
 	return &sub, nil
+}
+
+// FindActiveByUserID trả các Web Push subscription đang active của 1 user.
+func (r *PushSubscriptionRepo) FindActiveByUserID(ctx context.Context, userID string) ([]models.PushSubscription, error) {
+	var out []models.PushSubscription
+	err := r.db.SelectContext(ctx, &out,
+		"SELECT "+pushSubscriptionColumns+" FROM push_subscriptions WHERE user_id = $1 AND is_active = true ORDER BY created_at ASC",
+		userID,
+	)
+	return out, err
+}
+
+// MarkFailed đánh dấu subscription không còn hoạt động (404/410) và ghi thời điểm thất bại.
+func (r *PushSubscriptionRepo) MarkFailed(ctx context.Context, id string, failedAt time.Time) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE push_subscriptions SET is_active = false, last_failed_at = $2 WHERE id = $1`,
+		id, failedAt.UTC(),
+	)
+	return err
 }

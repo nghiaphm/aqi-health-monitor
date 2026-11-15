@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/jmoiron/sqlx"
 
@@ -53,6 +54,58 @@ func (r *LocationRepo) FindByUserAndLabel(ctx context.Context, userID, label str
 		return nil, err
 	}
 	return &loc, nil
+}
+
+// StationAlertCandidate là bản ghi vị trí user có trạm gần nhất trong <= 20km là stationID
+// và user đã thiết lập alert_thresholds (chưa có threshold tự động bị loại bởi JOIN).
+type StationAlertCandidate struct {
+	LocationID    string         `db:"location_id"`
+	UserID        string         `db:"user_id"`
+	LocationLabel string         `db:"location_label"`
+	UserEmail     string         `db:"user_email"`
+	UserFullName  sql.NullString `db:"user_full_name"`
+	ThresholdAQI  int            `db:"threshold_aqi"`
+}
+
+// FindNearestCandidatesByStation trả các vị trí user thỏa đồng thời:
+//  1. Trạm active gần nhất trong bán kính maxMeters (20km) chính là stationID.
+//  2. User đã có ít nhất 1 alert_thresholds đang hiệu lực.
+//
+// Kết quả sắp xếp ưu tiên label 'current' trước 'home' để service dedup xác định per-user.
+func (r *LocationRepo) FindNearestCandidatesByStation(
+	ctx context.Context,
+	stationID string,
+	maxMeters float64,
+) ([]StationAlertCandidate, error) {
+	var out []StationAlertCandidate
+	query := `
+		SELECT
+			ul.id AS location_id,
+			ul.user_id AS user_id,
+			ul.label AS location_label,
+			u.email AS user_email,
+			u.full_name AS user_full_name,
+			at.threshold_aqi AS threshold_aqi
+		FROM user_locations ul
+		JOIN users u ON u.id = ul.user_id
+		JOIN LATERAL (
+			SELECT t.threshold_aqi
+			FROM alert_thresholds t
+			WHERE t.user_id = ul.user_id
+			ORDER BY t.updated_at DESC
+			LIMIT 1
+		) at ON true
+		JOIN LATERAL (
+			SELECT s.id
+			FROM stations s
+			WHERE s.is_active = true
+			  AND ST_DWithin(s.geom, ul.geom, $2)
+			ORDER BY ST_Distance(s.geom, ul.geom) ASC
+			LIMIT 1
+		) ns ON ns.id = $1
+		ORDER BY ul.user_id, CASE WHEN ul.label = 'current' THEN 0 ELSE 1 END, ul.created_at ASC`
+	err := r.db.SelectContext(ctx, &out, query, stationID, maxMeters)
+	return out, err
 }
 
 // UpsertByUserAndLabel upsert ATOMIC theo (user_id, label) bằng ON CONFLICT

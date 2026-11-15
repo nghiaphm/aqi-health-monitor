@@ -91,11 +91,33 @@ type SyncStationsResult struct {
 
 // FetchReadingsResult là log tổng kết 1 lần fetch_readings.
 type FetchReadingsResult struct {
-	Total    int
-	Success  int
-	Skipped  int
-	Failed   int
-	Inserted int
+	Total         int
+	Success       int
+	Skipped       int
+	Failed        int
+	Inserted      int
+	AlertEnqueued int
+}
+
+// AlertCheckEnqueuer đẩy job check_alerts(station_id) sau khi có reading mới.
+type AlertCheckEnqueuer interface {
+	EnqueueCheckAlerts(ctx context.Context, stationID string) error
+}
+
+type aqiWAQIClient interface {
+	FetchStationsInBounds(ctx context.Context, lat1, lng1, lat2, lng2 float64) ([]waqi.BoundsStation, error)
+	FetchStationFeed(ctx context.Context, waqiStationID string) (*waqi.Feed, error)
+}
+
+type aqiStationStore interface {
+	UpsertByWAQIID(ctx context.Context, waqiStationID, name string, lat, lon float64, city *string) (*models.Station, error)
+	ListActive(ctx context.Context) ([]models.Station, error)
+	FindNearestWithin(ctx context.Context, lat, lon, maxMeters float64) (*repository.NearestStation, error)
+}
+
+type aqiReadingStore interface {
+	Insert(ctx context.Context, rd models.AQIReading) (bool, error)
+	GetLatest(ctx context.Context, stationID string) (*models.AQIReading, error)
 }
 
 // cachedReading là payload lưu Redis key aqi:current:{station_id} (cache-aside).
@@ -113,13 +135,14 @@ type cachedReading struct {
 
 // AQIService xử lý ingestion: đồng bộ trạm + fetch reading + ghi cache, và API tra cứu AQI hiện tại.
 type AQIService struct {
-	waqi      *waqi.Client
-	stations  *repository.StationRepo
-	readings  *repository.AQIReadingRepo
-	redis     *redis.Client
-	users     *UserSyncer
-	locations *repository.LocationRepo
-	nowFunc   func() time.Time
+	waqi          aqiWAQIClient
+	stations      aqiStationStore
+	readings      aqiReadingStore
+	redis         *redis.Client
+	users         *UserSyncer
+	locations     *repository.LocationRepo
+	alertEnqueuer AlertCheckEnqueuer
+	nowFunc       func() time.Time
 }
 
 func NewAQIService(
@@ -130,15 +153,27 @@ func NewAQIService(
 	users *UserSyncer,
 	locations *repository.LocationRepo,
 ) *AQIService {
-	return &AQIService{
-		waqi:      waqiClient,
-		stations:  stations,
-		readings:  readings,
+	svc := &AQIService{
 		redis:     rdb,
 		users:     users,
 		locations: locations,
 		nowFunc:   time.Now,
 	}
+	if waqiClient != nil {
+		svc.waqi = waqiClient
+	}
+	if stations != nil {
+		svc.stations = stations
+	}
+	if readings != nil {
+		svc.readings = readings
+	}
+	return svc
+}
+
+// SetAlertEnqueuer gắn enqueuer để FetchReadings kích hoạt check_alerts khi có reading mới.
+func (s *AQIService) SetAlertEnqueuer(e AlertCheckEnqueuer) {
+	s.alertEnqueuer = e
 }
 
 func (s *AQIService) SetNowFunc(f func() time.Time) {
@@ -241,6 +276,13 @@ func (s *AQIService) FetchReadings(ctx context.Context) (FetchReadingsResult, er
 		result.Success++
 		if inserted {
 			result.Inserted++
+			if s.alertEnqueuer != nil {
+				if err := s.alertEnqueuer.EnqueueCheckAlerts(ctx, st.ID); err != nil {
+					slog.Warn("fetch_readings: enqueue check_alerts failed", "station_id", st.ID, "error", err)
+				} else {
+					result.AlertEnqueued++
+				}
+			}
 		}
 	}
 
@@ -250,11 +292,15 @@ func (s *AQIService) FetchReadings(ctx context.Context) (FetchReadingsResult, er
 		"skipped", result.Skipped,
 		"failed", result.Failed,
 		"inserted", result.Inserted,
+		"alert_enqueued", result.AlertEnqueued,
 	)
 	return result, nil
 }
 
 func (s *AQIService) cacheReading(ctx context.Context, stationID string, rd models.AQIReading) error {
+	if s.redis == nil {
+		return nil
+	}
 	payload := cachedReading{
 		AQI:               rd.AQI,
 		PM25:              rd.PM25,

@@ -54,6 +54,19 @@ func (r *StationRepo) UpsertByWAQIID(
 	return &s, nil
 }
 
+// FindByID trả trạm theo ID nội bộ. Không tìm thấy trả về sql.ErrNoRows.
+func (r *StationRepo) FindByID(ctx context.Context, id string) (*models.Station, error) {
+	var s models.Station
+	err := r.db.GetContext(ctx, &s,
+		"SELECT "+stationColumns+" FROM stations WHERE id = $1",
+		id,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
 // ListActive trả các trạm đang hoạt động để fetch_readings duyệt.
 func (r *StationRepo) ListActive(ctx context.Context) ([]models.Station, error) {
 	var out []models.Station
